@@ -39,7 +39,6 @@ Modified Copyright (C) 2021 Intel Corporation
 #include <x86intrin.h>
 extern uint64_t avg;
 extern uint64_t alignment_time;
-extern uint64_t ksw_wall_total_ns;
 extern void *km1;
 extern uint64_t km_size;// = 500000000; // 500 MB
 extern int km_top;
@@ -397,9 +396,6 @@ static void mm_align_pair(void *km, const mm_mapopt_t *opt, int qlen, const uint
 		for (i = 0; i < qlen; ++i) fputc("ACGTN"[qseq[i]], stderr);
 		fputc('\n', stderr);
 	}
-	{
-		struct timespec _ksw_t0, _ksw_t1;
-		clock_gettime(CLOCK_MONOTONIC, &_ksw_t0);
 	if (opt->max_sw_mat > 0 && (int64_t)tlen * qlen > opt->max_sw_mat) {
 		ksw_reset_extz(ez);
 		ez->zdropped = 1;
@@ -414,28 +410,12 @@ static void mm_align_pair(void *km, const mm_mapopt_t *opt, int qlen, const uint
             	ksw_extd2_avx512(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
 #elif __AVX2__
 	avg = 0;
-//	uint64_t *ptr_km = (uint64_t *) km1;
-//	for(uint64_t itr = 0; itr < km_size/512; itr++){
-//		avg+=ptr_km[itr];
-//	}
-
-//#ifdef MANUAL_PROFILING
-//	uint64_t align_start = __rdtsc();
-//#endif
 		ksw_extd2_avx2(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
-//#ifdef MANUAL_PROFILING
-//	alignment_time += (__rdtsc() - align_start);
-//#endif
 #endif
 #else
 		ksw_extd2_sse(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
 #endif
 	   }
-		clock_gettime(CLOCK_MONOTONIC, &_ksw_t1);
-		uint64_t _ksw_ns = (uint64_t)(_ksw_t1.tv_sec - _ksw_t0.tv_sec) * 1000000000ULL
-		                 + (uint64_t)(_ksw_t1.tv_nsec - _ksw_t0.tv_nsec);
-		__atomic_fetch_add(&ksw_wall_total_ns, _ksw_ns, __ATOMIC_RELAXED);
-	}
 	if (mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ) {
 		int i;
 		fprintf(stderr, "score=%d, cigar=", ez->score);
