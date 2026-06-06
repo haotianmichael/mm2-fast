@@ -33,6 +33,7 @@ Modified Copyright (C) 2021 Intel Corporation
 #include <assert.h>
 #include <errno.h>
 #include <time.h>
+#include <stdint.h>
 extern uint64_t ksw_wall_total_ns;
 #include "kthread.h"
 #include "kvec.h"
