@@ -32,9 +32,6 @@ Modified Copyright (C) 2021 Intel Corporation
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
-#include <time.h>
-#include <stdint.h>
-extern uint64_t ksw_wall_total_ns;
 #include "kthread.h"
 #include "kvec.h"
 #include "kalloc.h"
@@ -612,17 +609,8 @@ static void *worker_pipeline(void *shared, int step, void *in)
 			return s;
 		} else free(s);
     } else if (step == 1) { // step 1: map
-		if (p->n_parts > 0) {
-			merge_hits((step_t*)in);
-		} else {
-			struct timespec _t0, _t1;
-			clock_gettime(CLOCK_MONOTONIC, &_t0);
-			kt_for(p->n_threads, worker_for, in, ((step_t*)in)->n_frag);
-			clock_gettime(CLOCK_MONOTONIC, &_t1);
-			uint64_t _ns = (uint64_t)(_t1.tv_sec - _t0.tv_sec) * 1000000000ULL
-			             + (uint64_t)(_t1.tv_nsec - _t0.tv_nsec);
-			ksw_wall_total_ns += _ns;
-		}
+		if (p->n_parts > 0) merge_hits((step_t*)in);
+		else kt_for(p->n_threads, worker_for, in, ((step_t*)in)->n_frag);
 		return in;
     } else if (step == 2) { // step 2: output
 		void *km = 0;

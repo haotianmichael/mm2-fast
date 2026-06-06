@@ -39,6 +39,7 @@ Modified Copyright (C) 2021 Intel Corporation
 #include <x86intrin.h>
 extern uint64_t avg;
 extern uint64_t alignment_time;
+extern uint64_t ksw_wall_total_ns;
 extern void *km1;
 extern uint64_t km_size;// = 500000000; // 500 MB
 extern int km_top;
@@ -396,26 +397,33 @@ static void mm_align_pair(void *km, const mm_mapopt_t *opt, int qlen, const uint
 		for (i = 0; i < qlen; ++i) fputc("ACGTN"[qseq[i]], stderr);
 		fputc('\n', stderr);
 	}
-	if (opt->max_sw_mat > 0 && (int64_t)tlen * qlen > opt->max_sw_mat) {
-		ksw_reset_extz(ez);
-		ez->zdropped = 1;
-	} else if (opt->flag & MM_F_SPLICE)
-		ksw_exts2_sse(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->noncan, zdrop, opt->junc_bonus, flag, junc, ez);
-	else if (opt->q == opt->q2 && opt->e == opt->e2)
-		ksw_extz2_sse(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, w, zdrop, end_bonus, flag, ez);
-	else{
+	{
+		struct timespec _ksw_t0, _ksw_t1;
+		clock_gettime(CLOCK_MONOTONIC, &_ksw_t0);
+		if (opt->max_sw_mat > 0 && (int64_t)tlen * qlen > opt->max_sw_mat) {
+			ksw_reset_extz(ez);
+			ez->zdropped = 1;
+		} else if (opt->flag & MM_F_SPLICE)
+			ksw_exts2_sse(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->noncan, zdrop, opt->junc_bonus, flag, junc, ez);
+		else if (opt->q == opt->q2 && opt->e == opt->e2)
+			ksw_extz2_sse(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, w, zdrop, end_bonus, flag, ez);
+		else {
 #if defined (ALIGN_AVX) && (defined(__AVX512BW__) || (defined(__AVX2__) && defined(APPLY_AVX2)))
 #ifdef __AVX512BW__
-
-            	ksw_extd2_avx512(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
+			ksw_extd2_avx512(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
 #elif __AVX2__
-	avg = 0;
-		ksw_extd2_avx2(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
+			avg = 0;
+			ksw_extd2_avx2(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
 #endif
 #else
-		ksw_extd2_sse(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
+			ksw_extd2_sse(km, qlen, qseq, tlen, tseq, 5, mat, opt->q, opt->e, opt->q2, opt->e2, w, zdrop, end_bonus, flag, ez);
 #endif
-	   }
+		}
+		clock_gettime(CLOCK_MONOTONIC, &_ksw_t1);
+		uint64_t _ksw_ns = (uint64_t)(_ksw_t1.tv_sec - _ksw_t0.tv_sec) * 1000000000ULL
+		                 + (uint64_t)(_ksw_t1.tv_nsec - _ksw_t0.tv_nsec);
+		__atomic_fetch_add(&ksw_wall_total_ns, _ksw_ns, __ATOMIC_RELAXED);
+	}
 	if (mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ) {
 		int i;
 		fprintf(stderr, "score=%d, cigar=", ez->score);
