@@ -40,8 +40,6 @@ Modified Copyright (C) 2021 Intel Corporation
 extern uint64_t avg;
 extern uint64_t alignment_time;
 extern uint64_t ksw_wall_total_ns;
-extern uint64_t ksw_t_start_ns;
-extern uint64_t ksw_t_end_ns;
 extern void *km1;
 extern uint64_t km_size;// = 500000000; // 500 MB
 extern int km_top;
@@ -422,18 +420,9 @@ static void mm_align_pair(void *km, const mm_mapopt_t *opt, int qlen, const uint
 #endif
 		}
 		clock_gettime(CLOCK_MONOTONIC, &_ksw_t1);
-		uint64_t _t0_ns = (uint64_t)_ksw_t0.tv_sec * 1000000000ULL + (uint64_t)_ksw_t0.tv_nsec;
-		uint64_t _t1_ns = (uint64_t)_ksw_t1.tv_sec * 1000000000ULL + (uint64_t)_ksw_t1.tv_nsec;
-		// update global min start
-		uint64_t _prev_start = __atomic_load_n(&ksw_t_start_ns, __ATOMIC_RELAXED);
-		while (_t0_ns < _prev_start &&
-		       !__atomic_compare_exchange_n(&ksw_t_start_ns, &_prev_start, _t0_ns, 1,
-		                                    __ATOMIC_RELAXED, __ATOMIC_RELAXED));
-		// update global max end
-		uint64_t _prev_end = __atomic_load_n(&ksw_t_end_ns, __ATOMIC_RELAXED);
-		while (_t1_ns > _prev_end &&
-		       !__atomic_compare_exchange_n(&ksw_t_end_ns, &_prev_end, _t1_ns, 1,
-		                                    __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+		uint64_t _ksw_ns = (uint64_t)(_ksw_t1.tv_sec - _ksw_t0.tv_sec) * 1000000000ULL
+		                 + (uint64_t)(_ksw_t1.tv_nsec - _ksw_t0.tv_nsec);
+		__atomic_fetch_add(&ksw_wall_total_ns, _ksw_ns, __ATOMIC_RELAXED);
 	}
 	if (mm_dbg_flag & MM_DBG_PRINT_ALN_SEQ) {
 		int i;

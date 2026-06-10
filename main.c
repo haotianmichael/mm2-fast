@@ -49,8 +49,6 @@ using namespace std;
 uint64_t avg;
 uint64_t minimizer_lookup_time, alignment_time, dp_time, rmq_time, rmq_t1, rmq_t2, rmq_t3, rmq_t4;
 uint64_t ksw_wall_total_ns = 0;
-uint64_t ksw_t_start_ns = UINT64_MAX;  // first ksw call start (global min)
-uint64_t ksw_t_end_ns   = 0;           // last  ksw call end   (global max)
 
 bool enable_vect_dp_chaining = false;
 
@@ -573,8 +571,7 @@ int main(int argc, char *argv[])
 	}
 
 	fprintf(stderr, "minimizer-lookup: %lld dp: %lld rmq: %lld rmq_t1: %lld rmq_t2: %lld rmq_t3: %lld rmq_t4: %lld alignment: %lld %lld\n", minimizer_lookup_time, dp_time, rmq_time, rmq_t1, rmq_t2, rmq_t3, rmq_t4, alignment_time, avg);
-	fprintf(stderr, "\n[KSW timing] total wall time: %.3f ms\n",
-	        ksw_t_end_ns > ksw_t_start_ns ? (ksw_t_end_ns - ksw_t_start_ns) / 1e6 : 0.0);
+	fprintf(stderr, "\n[KSW timing] total wall time: %.3f ms\n", ksw_wall_total_ns / 1e6 / n_threads);
 #ifdef LISA_HASH
 	delete lh;
 #endif
